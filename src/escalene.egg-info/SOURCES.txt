@@ -1,0 +1,9 @@
+README.md
+pyproject.toml
+src/escalene/__init__.py
+src/escalene/models.py
+src/escalene.egg-info/PKG-INFO
+src/escalene.egg-info/SOURCES.txt
+src/escalene.egg-info/dependency_links.txt
+src/escalene.egg-info/requires.txt
+src/escalene.egg-info/top_level.txt
