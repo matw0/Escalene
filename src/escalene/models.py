@@ -1,16 +1,8 @@
-"""Data models used by Escalene.
-
-These models represent collected evidence only. They do not decide whether a
-configuration is vulnerable or exploitable.
-"""
-
 from dataclasses import dataclass
 
 
 @dataclass(frozen=True)
 class ServiceRecord:
-    """Observed metadata for one Windows service."""
-
     name: str
     display_name: str
     binary_path: str | None = None
@@ -18,3 +10,5 @@ class ServiceRecord:
     run_as_account: str | None = None
     state: str | None = None
     collection_errors: tuple[str, ...] = ()
+    can_change_config: bool | None = None
+    
