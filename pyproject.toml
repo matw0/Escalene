@@ -7,6 +7,9 @@ name = "escalene"
 version = "0.1.0"
 description = "Windows privilege escalation and security assessment toolkit"
 requires-python = ">=3.12"
+dependencies = [
+    "pywin32; sys_platform == 'win32'",
+]
 
 [project.optional-dependencies]
 dev = [
