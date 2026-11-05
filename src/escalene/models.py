@@ -11,4 +11,25 @@ class ServiceRecord:
     state: str | None = None
     collection_errors: tuple[str, ...] = ()
     can_change_config: bool | None = None
-    
+
+@dataclass(frozen=True)
+class Finding:
+    finding_id: str
+    title: str
+    severity: str
+    confidence: str
+    target: str
+    description: str
+    evidence: tuple[str, ...]
+    remediation: str
+    cwe_id: str | None = None
+    limitations: tuple[str, ...] = ()
+
+@dataclass(frozen=True)
+class Token:
+    account_name: str
+    user_SID: str | None = None
+    is_elevated: bool | None = None
+    integrity_level: str | None = None
+    is_local_admin: bool | None = None
+    collection_errors: tuple[str, ...] = ()
