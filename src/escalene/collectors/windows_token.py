@@ -1,5 +1,6 @@
 from win32 import win32api, win32security
 import win32con
+import pywintypes
 from escalene.models import Token
 
 def Open_Process_Token(func):
@@ -44,27 +45,60 @@ def Convert_SID_String_SID(user_SID):
 
 
 def collect_token_context():
+    SID_string = None
     account_name = "Unknown"
     user_SID_UP = None
     is_elevated = None
     integrity_level = None
-    is_local_admin = False
+    is_local_admin = None
     token_h = None
+    collection_errors = []
     
     try:
-        token_h = Get_Current_Process()
-        user_SID_UP = Get_Token_Information_TU(token_h)
-        user_SID_P = user_SID_UP[0]
-        SID_string = Convert_SID_String_SID(user_SID_P)
-        account_name, domain, _ = Look_Up_Account_SID(user_SID_P)
-        account_name = (f"{domain}\\{account_name}" if domain else account_name)
+        try:
+            token_h = Get_Current_Process()
+        except pywintypes.error as error:
+            collection_errors.append(f"OpenProcessToken\\{error.winerror}: {error.strerror}",)
 
-        is_elevated = Get_Token_Information_IE(token_h)
-        integrity_level = Get_Token_Information_IL(token_h)
-
-
-        return Token(account_name=account_name, user_SID=SID_string, is_elevated=is_elevated, integrity_level=integrity_level, is_local_admin=Check_Local_Admin())
-    
-    finally:
         if token_h is not None:
-            win32api.CloseHandle(token_h)
+            try:
+                user_SID_UP = Get_Token_Information_TU(token_h)
+                user_SID_P = user_SID_UP[0]
+            except pywintypes.error as error:
+                collection_errors.append(f"TokenUser\\{error.winerror}: {error.strerror}",)
+
+            else:
+                try:
+                    SID_string = Convert_SID_String_SID(user_SID_P)
+                except pywintypes.error as error:
+                    collection_errors.append(f"ConvertSIDtoStringSID\\{error.winerror}: {error.strerror}",)
+
+                try:
+                    name, domain, _ = Look_Up_Account_SID(user_SID_P)
+                    account_name = f"{domain}\\{name}" if domain else name
+                except pywintypes.error as error:
+                    collection_errors.append(f"LookUpAccountSID\\{error.winerror}: {error.strerror}",)
+
+            try:
+                is_elevated = Get_Token_Information_IE(token_h)
+            except pywintypes.error as error:
+                collection_errors.append(f"TokenElevation\\{error.winerror}: {error.strerror}",)
+
+            try:
+                integrity_level = Get_Token_Information_IL(token_h)
+            except pywintypes.error as error:
+                collection_errors.append(f"TokenIntegrityLevel\\{error.winerror}: {error.strerror}",)
+
+            try:
+                is_local_admin = Check_Local_Admin()
+            except pywintypes.error as error:
+                collection_errors.append(f"CheckTokenMembership\\{error.winerror}: {error.strerror}",)
+        
+    finally:
+            if token_h is not None:
+                try:
+                    win32api.CloseHandle(token_h)
+                except pywintypes.error as error:
+                    collection_errors.append(f"CloseHandleError:\\{error.winerror}: {error.strerror}",)
+
+    return Token(account_name=account_name, user_SID=SID_string, is_elevated=is_elevated, integrity_level=integrity_level, is_local_admin=is_local_admin, collection_errors=collection_errors)
