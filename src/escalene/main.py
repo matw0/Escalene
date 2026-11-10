@@ -1,9 +1,41 @@
 from escalene.collectors.windows_services import collect_services
 from escalene.collectors.windows_token import collect_token_context
+from escalene.models import ScanResult
+
+BANNER = r"""
+ ______   ______   ______   ________   __       ______   ___   __    ______      
+/_____/\ /_____/\ /_____/\ /_______/\ /_/\     /_____/\ /__/\ /__/\ /_____/\     
+\::::_\/_\::::_\/_\:::__\/ \::: _  \ \\:\ \    \::::_\/_\::\_\\  \ \\::::_\/_    
+ \:\/___/\\:\/___/\\:\ \  __\::(_)  \ \\:\ \    \:\/___/\\:. `-\  \ \\:\/___/\   
+  \::___\/_\_::._\:\\:\ \/_/\\:: __  \ \\:\ \____\::___\/_\:. _    \ \\::___\/_  
+   \:\____/\ /____\:\\:\_\ \ \\:.\ \  \ \\:\/___/\\:\____/\\. \`-\  \ \\:\____/\ 
+    \_____\/ \_____\/ \_____\/ \__\/\__\/ \_____\/ \_____\/ \__\/ \__\/ \_____\/ 
+
+
+                                                 ________
+                                                |\       \
+                                                |  \       \ 
+                                         _______|    \       \ 
+                                        |\      \     +-------+
+                                        |  \      \   |       |
+                                 _______|    \      \ |       |
+                                 |\      \     +-----+        |
+                                 |  \      \   |              |
+                          _______|    \      \ |              |
+                          |\      \     +-----+               |
+                          |  \      \   |                     |
+                          |    \      \ |                     |
+                           \     +-----+                      |
+                             \   |  https://github.com/matw0  |
+                               \ |        by matw0            |
+                                +-----------------------------+
+    
+"""
 
 def main() -> None:
     services = collect_services()
     token = collect_token_context()
+    scan = ScanResult(token=token, services=services)
 
     print("Current token")
     print(f"Account:       {token.account_name}")
@@ -14,9 +46,9 @@ def main() -> None:
     print(f"Errors:        {', '.join(token.collection_errors) or 'none'}")
     print()
 
-    print(f"Captured {len(services)} windows services.\n")
+    print(f"Captured {len(scan.services)} windows services.\n")
 
-    for service in services:
+    for service in scan.services:
         print(f"\nName:         {service.name}")
         print(f"Display name: {service.display_name}")
         print(f"State:        {service.state or 'unavailable'}")
@@ -31,17 +63,6 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    print(r"""
- ______   ______   ______   ________   __       ______   ___   __    ______      
-/_____/\ /_____/\ /_____/\ /_______/\ /_/\     /_____/\ /__/\ /__/\ /_____/\     
-\::::_\/_\::::_\/_\:::__\/ \::: _  \ \\:\ \    \::::_\/_\::\_\\  \ \\::::_\/_    
- \:\/___/\\:\/___/\\:\ \  __\::(_)  \ \\:\ \    \:\/___/\\:. `-\  \ \\:\/___/\   
-  \::___\/_\_::._\:\\:\ \/_/\\:: __  \ \\:\ \____\::___\/_\:. _    \ \\::___\/_  
-   \:\____/\ /____\:\\:\_\ \ \\:.\ \  \ \\:\/___/\\:\____/\\. \`-\  \ \\:\____/\ 
-    \_____\/ \_____\/ \_____\/ \__\/\__\/ \_____\/ \_____\/ \__\/ \__\/ \_____\/ 
+    main()
 
-
-                                    by matw0
-                        github - https://github.com/matw0
-    """)
-    #main()
+    

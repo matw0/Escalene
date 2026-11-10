@@ -33,3 +33,9 @@ class Token:
     integrity_level: str | None = None
     is_local_admin: bool | None = None
     collection_errors: tuple[str, ...] = ()
+
+@dataclass(frozen=True)
+class ScanResult:
+    token: Token | None = None
+    services: tuple[ServiceRecord, ...] = ()
+    findings: tuple[Finding, ...] = ()
