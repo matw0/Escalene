@@ -51,6 +51,7 @@ def can_change_service_config(service_manager, service_name: str) -> tuple[bool 
 def collect_services() -> tuple[ServiceRecord, ...]:
     manager_access = (win32service.SC_MANAGER_CONNECT | win32service.SC_MANAGER_ENUMERATE_SERVICE)
     service_manager = win32service.OpenSCManager(None, None, manager_access,)
+    
 
     try:
         services = win32service.EnumServicesStatus(service_manager, win32service.SERVICE_WIN32, win32service.SERVICE_STATE_ALL)
@@ -66,8 +67,12 @@ def collect_services() -> tuple[ServiceRecord, ...]:
             run_as_account = None
             collection_errors = ()
 
+            collection_errors = ()
+            operation = "OpenService (SERVICE_QUERY_CONFIG)"
+
             try:
-                service_handle = win32service.OpenService(service_manager,service_name,win32service.SERVICE_QUERY_CONFIG,)
+                service_handle = win32service.OpenService(service_manager, service_name, win32service.SERVICE_QUERY_CONFIG,)
+                operation = "QueryServiceConfig"
                 configuration = win32service.QueryServiceConfig(service_handle)
 
                 start_type = service_start_type_name(configuration[1])
@@ -75,16 +80,15 @@ def collect_services() -> tuple[ServiceRecord, ...]:
                 run_as_account = configuration[7]
 
             except pywintypes.error as error:
-                collection_errors += (f"{error.winerror}: {error.strerror}",)
-
+                collection_errors += (f"{operation}: {error.winerror}: {error.strerror}",)
             finally:
                 if service_handle is not None:
                     win32service.CloseServiceHandle(service_handle)
 
-            can_change_config, permission_error = can_change_service_config(service_manager, service_name,)
-            if permission_error is not None:
-                collection_errors += (permission_error,)
+            can_change_config, permission_error = can_change_service_config(service_manager, service_name)
 
+            if permission_error is not None:
+                collection_errors += (permission_error,) 
 
             records.append(ServiceRecord(name=service_name, display_name=display_name, binary_path=binary_path, start_type=start_type, run_as_account=run_as_account, state=service_state_name(current_state), collection_errors=collection_errors,
                                          can_change_config=can_change_config,))

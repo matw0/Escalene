@@ -1,6 +1,12 @@
 from escalene.collectors.windows_services import collect_services
 from escalene.collectors.windows_token import collect_token_context
+from escalene.analyzers.windows_services import analyze_services
 from escalene.models import ScanResult
+import sys
+import threading
+from contextlib import contextmanager
+from itertools import cycle
+
 
 BANNER = r"""
  ______   ______   ______   ________   __       ______   ___   __    ______      
@@ -31,36 +37,84 @@ BANNER = r"""
                                 +-----------------------------+
     
 """
+def animate_loading(message: str, stop_event: threading.Event) -> None:
+    for frame in cycle("|/-\\"):
+        if stop_event.is_set():
+            break
+
+        sys.stderr.write(f"\r[{frame}] {message}")
+        sys.stderr.flush()
+        stop_event.wait(0.1)
+
+@contextmanager
+def spinner(message: str):
+    stop_event = threading.Event()
+
+    spinner_thread = threading.Thread(
+        target=animate_loading,
+        args=(message, stop_event),
+        daemon=True,
+    )
+
+    spinner_thread.start()
+
+    try:
+        yield
+    except Exception:
+        stop_event.set()
+        spinner_thread.join()
+        sys.stderr.write(f"\r[!] {message} failed.\n")
+        sys.stderr.flush()
+        raise
+    else:
+        stop_event.set()
+        spinner_thread.join()
+        sys.stderr.write(f"\r[*] {message} complete.\n")
+        sys.stderr.flush()
+
 
 def main() -> None:
-    services = collect_services()
-    token = collect_token_context()
-    scan = ScanResult(token=token, services=services)
+    print(BANNER)
 
-    print("Current token")
-    print(f"Account:       {token.account_name}")
-    print(f"SID:           {token.user_SID or 'unavailable'}")
-    print(f"Elevated:      {token.is_elevated}")
-    print(f"Integrity:     {token.integrity_level or 'unavailable'}")
-    print(f"Local admin:   {token.is_local_admin}")
-    print(f"Errors:        {', '.join(token.collection_errors) or 'none'}")
-    print()
+    with spinner("Collecting token and service information..."):
+        token = collect_token_context()
+        services = collect_services()
 
-    print(f"Captured {len(scan.services)} windows services.\n")
+    findings = analyze_services(services, token)
 
-    for service in scan.services:
-        print(f"\nName:         {service.name}")
-        print(f"Display name: {service.display_name}")
-        print(f"State:        {service.state or 'unavailable'}")
-        print(f"Start type:   {service.start_type or 'unavailable'}")
-        print(f"Account:      {service.run_as_account or 'unavailable'}")
-        print(f"Binary path:  {service.binary_path or 'unavailable'}")
-        print(
-            "Errors:       "
-            + (", ".join(service.collection_errors) or "none")
-        )
-        print(f"Change Config: {service.can_change_config}")
+    scan = ScanResult(token=token, services=services, findings=findings)
 
+    token_error_count = len(token.collection_errors)
+    service_error_count = sum(len(service.collection_errors) for service in scan.services)
+    collection_error_count = token_error_count + service_error_count
+
+    print("\nScan summary")
+    print(f"Services collected: {len(scan.services)}")
+    print(f"Findings:           {len(scan.findings)}")
+    print(f"Collection errors:  {collection_error_count}")
+
+    if collection_error_count:
+        print("\nCollection error details")
+
+        for error in token.collection_errors:
+            print(f"  [Token] {error}")
+
+        for service in scan.services:
+            for error in service.collection_errors:
+                print(f"[!]--------[Service: {service.name}] {error}")
+
+    if not scan.findings:
+        print("\nNo findings from the checks completed.")
+
+    for finding in scan.findings:
+        print(f"\nID:       {finding.finding_id}")
+        print(f"Title:    {finding.title}")
+        print(f"Target:   {finding.target}")
+        print(f"Severity: {finding.severity}")
+        print("Evidence:")
+
+        for evidence_item in finding.evidence:
+            print(f"  - {evidence_item}")
 
 if __name__ == "__main__":
     main()
