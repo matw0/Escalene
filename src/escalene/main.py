@@ -6,7 +6,7 @@ import sys
 import threading
 from contextlib import contextmanager
 from itertools import cycle
-
+import argparse
 
 BANNER = r"""
  ______   ______   ______   ________   __       ______   ___   __    ______      
@@ -93,7 +93,7 @@ def main() -> None:
     print(f"Findings:           {len(scan.findings)}")
     print(f"Collection errors:  {collection_error_count}")
 
-    if collection_error_count:
+    if args.verbose and collection_error_count:
         print("\nCollection error details")
 
         for error in token.collection_errors:
@@ -117,6 +117,15 @@ def main() -> None:
             print(f"  - {evidence_item}")
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        description="""Escalene is a read-only Windows security auditing tool. It inventories local services, reports the current user’s access context, and highlights permission findings for review.""")
+    parser.add_argument(
+    "-v",
+    "--verbose",
+    action="store_true",
+    help="Show detailed collection errors.",
+)
+    args = parser.parse_args()
     main()
 
     
