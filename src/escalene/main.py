@@ -1,12 +1,14 @@
 from escalene.collectors.windows_services import collect_services
 from escalene.collectors.windows_token import collect_token_context
 from escalene.analyzers.windows_services import analyze_services
+from escalene.collectors.windows_processes import collect_processes
 from escalene.models import ScanResult
 import sys
 import threading
 from contextlib import contextmanager
 from itertools import cycle
 import argparse
+
 
 BANNER = r"""
  ______   ______   ______   ________   __       ______   ___   __    ______      
@@ -73,15 +75,58 @@ def spinner(message: str):
         sys.stderr.flush()
 
 
-def main() -> None:
+def main(args: argparse.Namespace) -> None:
     print(BANNER)
 
-    with spinner("Collecting token and service information..."):
-        token = collect_token_context()
-        services = collect_services()
+    run_services = args.target in ("all", "services")
+    show_token = args.target in ("all", "token")
+    services = ()
 
-    findings = analyze_services(services, token)
+    if args.target == "services":
+        message = "Collecting data for the service audit"
+    elif args.target == "token":
+        message = "Collecting token information"
+    elif args.target == "processes":
+        message = "Collecting current processes information"
+    else:
+        message = "Processing audit for token, service and process enumeration"
 
+    with spinner(message):
+        if args.target == "processes":
+            processes = collect_processes()
+        else:
+            token = collect_token_context()
+
+            if run_services:
+                services = collect_services()
+
+    if args.target == "processes":
+        print(f"\nProcesses collected: {len(processes)}")
+        if args.verbose:
+            for process in processes:
+                PID = process.PID
+                name = process.name or "Unavailable"
+                path = process.exec_path or "Unavailable"
+                run_as_account = process.run_as_account or "Unavailable"
+                print(f"{PID:>7}  {name:<28}  {run_as_account:<32}  {path}")
+        else:
+            return None
+
+    if show_token:
+        print(f"\nAccount: {token.account_name}")
+        print(f"Elevated: {token.is_elevated}")
+        print(f"Integrity: {token.integrity_level}")
+        print(f"Collection errors: {len(token.collection_errors)}\n")
+
+        if args.verbose and not run_services:
+            for error in token.collection_errors:
+                print(f"  [Token] {error}")
+
+
+    if not run_services:
+        return None
+
+    findings = analyze_services(services, token) 
     scan = ScanResult(token=token, services=services, findings=findings)
 
     token_error_count = len(token.collection_errors)
@@ -111,21 +156,50 @@ def main() -> None:
         print(f"Title:    {finding.title}")
         print(f"Target:   {finding.target}")
         print(f"Severity: {finding.severity}")
+        print(f"Description: {finding.description}")
         print("Evidence:")
-
         for evidence_item in finding.evidence:
             print(f"  - {evidence_item}")
+        print(f"Remediation: {finding.remediation}")
+        if finding.limitations:
+            print("Limitations:")
+            for limitation in finding.limitations:
+                print(f"  - {limitation}")   
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="""Escalene is a read-only Windows security auditing tool. It inventories local services, reports the current user’s access context, and highlights permission findings for review.""")
+        description="""Escalene is a read-only Windows security auditing tool. It inventories local services, reports the current user’s access context, and highlights permission findings for review.""", add_help=False,)
     parser.add_argument(
-    "-v",
+        "-?", "-h", "-H", "--help",
+        action="help",
+        help="Show help dropdown menus",
+    )
+    parser.add_argument(
+    "-V",
     "--verbose",
     action="store_true",
-    help="Show detailed collection errors.",
+    help="Show detailed collection errors",
 )
+    parser.add_argument(
+        "-T",
+        "--target",
+        choices=("all", "services", "token", "processes"),
+        default="all",
+        help="Choose which local checks to run - (default:all)",
+    )
+    # parser.add_argument(
+    #     "--script",
+    #     choices=("all", "services", "token", "processes"),
+    #     default="all",
+    #     help="Choose which local checks to run - (default:all)",
+    # )
+
+    if len(sys.argv) == 1:
+        parser.print_help()
+        raise SystemExit(0)
+    
     args = parser.parse_args()
-    main()
+    main(args)
 
     

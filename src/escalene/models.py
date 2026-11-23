@@ -35,7 +35,16 @@ class Token:
     collection_errors: tuple[str, ...] = ()
 
 @dataclass(frozen=True)
+class Process:
+    PID: str
+    name: str
+    exec_path: str
+    collection_errors: tuple[str, ...] = ()
+    run_as_account: str | None = None
+
+@dataclass(frozen=True)
 class ScanResult:
     token: Token | None = None
     services: tuple[ServiceRecord, ...] = ()
     findings: tuple[Finding, ...] = ()
+
